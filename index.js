@@ -1,13 +1,9 @@
-const admin = require('firebase-admin');
+const { Firestore, Timestamp, FieldValue } = require('@google-cloud/firestore');
 const twilio = require('twilio');
 
-// Firebase Admin初期化
+// Firestore初期化（firebase-adminより軽量でコールドスタートが高速）
 // Cloud Functions環境では自動的に認証情報が設定されます
-if (admin.apps.length === 0) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
+const db = new Firestore();
 
 // Twilio クライアント初期化
 const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -65,8 +61,8 @@ exports.sendVerificationCode = async (req, res) => {
       code: verificationCode,
       phoneNumber: phoneNumber,
       method: method,
-      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromDate(expiresAt),
+      createdAt: FieldValue.serverTimestamp(),
       verified: false
     });
 
@@ -186,7 +182,7 @@ exports.verifyCode = async (req, res) => {
     // 検証成功 - ドキュメントを更新
     await docRef.update({
       verified: true,
-      verifiedAt: admin.firestore.FieldValue.serverTimestamp()
+      verifiedAt: FieldValue.serverTimestamp()
     });
 
     console.log(`Verification successful for ${phoneNumber}`);
