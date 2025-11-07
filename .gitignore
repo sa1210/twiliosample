@@ -10,6 +10,7 @@ node_modules/
 *.json
 !package.json
 !package-lock.json
+!firebase.json
 id.txt
 
 # Logs

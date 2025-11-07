@@ -1,41 +1,81 @@
-# Twilio SMS/音声認証 Cloud Functions
+# Twilio SMS/音声認証システム
 
-TwilioとGoogle Cloud Functionsを使用したSMS・音声通話による認証システムです。
+TwilioとGoogle Cloud Functions、Firebase Hostingを使用したSMS・音声通話による認証システムです。
+
+## デモ
+
+https://sakuma-pandatest.web.app
 
 ## 機能
 
+### バックエンド（Cloud Functions）
 - SMS送信による認証コード送信
 - 音声通話による認証コード読み上げ
-- Firestoreでの認証コード管理
+- Firestoreでの認証コード管理（tw_verification_codesコレクション）
 - 認証コードの検証
 - 有効期限管理（5分）
+
+### フロントエンド（Firebase Hosting）
+- モダンなWebUI
+- 電話番号入力とバリデーション
+- SMS/音声通話の選択
+- 認証コード入力と検証
+- レスポンシブデザイン
 
 ## 必要な環境
 
 - Node.js 20以上
 - Google Cloud SDK
+- Firebase CLI
 - Twilioアカウント
-- Firebase/Firestoreプロジェクト
+- Firebase/Firestoreプロジェクト（課金有効化必須）
 
 ## セットアップ
 
-### 1. 依存関係のインストール
+### 1. リポジトリのクローン
+
+```bash
+git clone https://github.com/sa1210/twliosample.git
+cd twliosample
+```
+
+### 2. 依存関係のインストール
 
 ```bash
 npm install
 ```
 
-### 2. Google Cloud プロジェクトの設定
+### 3. 環境変数ファイルの作成
+
+`.env.yaml`ファイルをプロジェクトルートに作成してください：
+
+```yaml
+TWILIO_ACCOUNT_SID: "あなたのTwilio Account SID"
+TWILIO_AUTH_TOKEN: "あなたのTwilio Auth Token"
+TWILIO_PHONE_NUMBER: "+1234567890"  # あなたのTwilio電話番号
+```
+
+**重要**:
+- サービスアカウントのJSONファイルは**不要**です（Cloud Functionsがデフォルト認証を使用）
+- `.env.yaml`はGitにコミットされません（機密情報のため）
+
+### 4. Google Cloud プロジェクトの設定
 
 ```bash
 # Google Cloudにログイン
 gcloud auth login
 
-# プロジェクトを設定
-gcloud config set project sakuma-pandatest
+# プロジェクトを設定（あなたのプロジェクトIDに変更）
+gcloud config set project YOUR_PROJECT_ID
+
+# 必要なAPIを有効化
+gcloud services enable cloudfunctions.googleapis.com
+gcloud services enable cloudbuild.googleapis.com
+gcloud services enable artifactregistry.googleapis.com
+gcloud services enable run.googleapis.com
 ```
 
-### 3. デプロイ
+### 5. Cloud Functionsのデプロイ
 
 ```bash
 # 個別にデプロイする場合
@@ -43,17 +83,30 @@ gcloud functions deploy sendVerificationCode \
   --runtime nodejs20 \
   --trigger-http \
   --allow-unauthenticated \
-  --env-vars-file .env.yaml
+  --env-vars-file .env.yaml \
+  --region asia-northeast1 \
+  --gen2
 
 gcloud functions deploy verifyCode \
   --runtime nodejs20 \
   --trigger-http \
   --allow-unauthenticated \
-  --env-vars-file .env.yaml
-
-# または npm script を使用
-npm run deploy
+  --env-vars-file .env.yaml \
+  --region asia-northeast1 \
+  --gen2
 ```
+
+### 6. Firebase Hostingのデプロイ
+
+```bash
+# Firebase CLIにログイン
+firebase login
+
+# Hostingをデプロイ
+firebase deploy --only hosting
+```
+
+デプロイ後、表示されるURLでWebUIにアクセスできます。
 
 ## API 使用方法
 
@@ -162,12 +215,34 @@ export TWILIO_PHONE_NUMBER="+1..."
 functions-framework --target=sendVerificationCode --port=8080
 ```
 
+## クローン後に必要なファイル
+
+他の人がこのリポジトリをクローンした場合、以下のファイルを自分で用意する必要があります：
+
+### 必須
+- **`.env.yaml`** - Twilioの認証情報を記載（上記セットアップ参照）
+
+### 不要
+- **サービスアカウントJSON** - Cloud Functionsはデフォルト認証を使用するため不要
+- **id.txt** - 開発時のメモファイル（削除済み）
+
 ## セキュリティ注意事項
 
 - 本番環境では `--allow-unauthenticated` を外して認証を追加してください
-- レート制限の実装を検討してください
-- 環境変数ファイル (.env.yaml) は絶対にGitにコミットしないでください
-- サービスアカウントのJSONファイルは安全に管理してください
+- レート制限の実装を検討してください（悪用防止）
+- 環境変数ファイル（`.env.yaml`）は絶対にGitにコミットしないでください
+- Twilio認証情報を安全に管理してください
+
+## 料金について
+
+### Cloud Functions & Firebase
+- 無料枠: 月200万回の呼び出し、40万GB秒のコンピューティング
+- テストで数回〜数十回叩く程度なら完全無料
+
+### Twilio
+- SMS送信: 約$0.0075/通（約1円/通）
+- 音声通話: 約$0.013/分（約2円/分）
+- **テスト10回程度なら10〜20円程度**
 
 ## トラブルシューティング
 
@@ -175,12 +250,18 @@ functions-framework --target=sendVerificationCode --port=8080
 
 - Twilioの電話番号が有効か確認
 - Twilioアカウントの残高を確認
-- 送信先の電話番号がE.164形式であることを確認
+- 送信先の電話番号がE.164形式（+81...）であることを確認
+
+### Cloud Functionsデプロイエラー
+
+- Google Cloud Projectで課金が有効になっているか確認
+- 必要なAPIが有効化されているか確認
+- `.env.yaml`ファイルが正しく作成されているか確認
 
 ### Firestoreエラー
 
-- サービスアカウントに適切な権限があるか確認
 - Firestoreが有効になっているか確認
+- Cloud FunctionsのサービスアカウントにFirestore権限があるか確認
 
 ## ライセンス
 
